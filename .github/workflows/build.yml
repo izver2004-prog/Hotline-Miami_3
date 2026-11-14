@@ -85,6 +85,20 @@ jobs:
             } > "$HOME/.config/godot/$f"
           done
 
+      - name: Patch project settings for Android
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          if ! grep -q "import_etc2_astc" project.godot; then
+            if grep -q "^\[rendering\]" project.godot; then
+              sed -i '/^\[rendering\]/a textures/vram_compression/import_etc2_astc=true' project.godot
+            else
+              printf '\n[rendering]\ntextures/vram_compression/import_etc2_astc=true\n' >> project.godot
+            fi
+          fi
+          grep -n "etc2" project.godot
+          ls -la "$HOME/.local/share/godot/export_templates/"*/ | head -20
+          cat "$HOME/.config/godot/editor_settings-4.3.tres"
+
       - name: Import project
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -95,7 +109,11 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           mkdir -p build
-          godot --headless --path . --export-debug "Android" build/HotlineMiamiRedux.apk
+          if ! godot --headless --path . --export-debug "Android" build/HotlineMiamiRedux.apk; then
+            echo "=== Повтор с --verbose для диагностики ==="
+            godot --headless --verbose --path . --export-debug "Android" build/HotlineMiamiRedux.apk 2>&1 | tail -80
+            exit 1
+          fi
 
       - name: Verify APK exists
         working-directory: ${{ env.PROJECT_DIR }}
